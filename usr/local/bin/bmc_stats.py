@@ -2,7 +2,8 @@
 
 """
 Sample script to get stats from BMC rest interface.
-
+Taken from https://github.com/facebook/openbmc/pull/20/
+Written by Phil Dibowitz @ facebook
 Assumes that the usb0 interface on BMC is 192.168.0.1 and usb0 interface
 on microserver is 192.168.0.2.
 """
