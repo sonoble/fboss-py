@@ -11,10 +11,9 @@ from __future__ import absolute_import
 
 import contextlib
 import ipaddr
-import pdb
+import socket
 
-from argparse import ArgumentParser, ArgumentError
-from contextlib import contextmanager
+from argparse import ArgumentParser
 from thrift.transport import TSocket
 from thrift.protocol import TBinaryProtocol
 from fboss.ctrl import FbossCtrl
@@ -53,52 +52,68 @@ def del_route(args):
     with get_client(args) as client:
         client.deleteUnicastRoutes(args.client, [prefix])
 
+
 def list_intf(args):
-    details = args.details
     with get_client(args) as client:
         #for intf in client.getInterfaceList():
         for idx, intf in client.getAllInterfaces().iteritems():
-            print ("L3 Interface %d: %s" %  (idx, str(intf)))
+            print ("L3 Interface %d: %s" % (idx, format_interface(intf)))
+
+def format_ip(ip):
+    family = socket.AF_INET if len(ip.addr) == 4 else socket.AF_INET6
+    return socket.inet_ntop(family, ip.addr)
+
+
+def format_route(route):
+    next_hops = ', '.join(format_ip(ip) for ip in route.nextHopAddrs)
+    return '%s --> %s' % (format_prefix(route.dest), next_hops)
+
+def format_prefix(prefix):
+    return '%s/%d' % (format_ip(prefix.ip), prefix.prefixLength)
+
+def format_interface(intf):
+    return '%s (%s)' % (
+            ', '.join(format_prefix(i) for i in intf.address), intf.mac)
+
+def format_arp(arp):
+    return '%s -> %s' % (format_ip(arp.ip), arp.mac)
 
 def list_routes(args):
-    details = args.details
     with get_client(args) as client:
         for route in client.getRouteTable():
-            print ("Route %s" %  route)
+            print ("Route %s" % format_route(route))
 
 def list_optics(args):
-    details = args.details
     with get_client(args) as client:
-        for key,val in client.getTransceiverInfo(range(1,64)).iteritems():
-            print ("Optic %d: %s" %  (key, str(val)))
+        info = client.getTransceiverInfo(range(1, 64))
+        for key, val in info.iteritems():
+            print ("Optic %d: %s" % (key, str(val)))
 
 def list_ports(args):
     details = args.details
     with get_client(args) as client:
         #for intf in client.getInterfaceList():
-        for idx, intf in client.getPortStatus(range(1,64)).iteritems():
+        for idx, intf in client.getPortStatus(range(1, 64)).iteritems():
             stats = client.getPortStats(idx) if details else ""
-            print ("Port %d: %s: %s" %  (idx, str(intf), stats))
+            print ("Port %d: %s: %s" % (idx, str(intf), stats))
 
 def list_arps(args):
-    details = args.details
     with get_client(args) as client:
         #for intf in client.getInterfaceList():
         for arp in client.getArpTable():
-            print ("Arp: %s" %  (str(arp)))
+            print ("Arp: %s" % (format_arp(arp)))
 
 
 def list_vlans(args):
-    details = args.details
     with get_client(args) as client:
         #for intf in client.getInterfaceList():
-        vlans = dict()
-        for idx, intf in  client.getAllInterfaces().iteritems():
+        vlans = {}
+        for idx, intf in client.getAllInterfaces().iteritems():
             vlans[intf.vlanId] = True
         for vlan in vlans:
             print("===== Vlan %d ==== " % vlan)
             for address in client.getVlanAddresses(vlan):
-                print(address)
+                print(address.addr)
 
 
 @contextlib.contextmanager
